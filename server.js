@@ -40,8 +40,6 @@ var scrape = function (roomID, callback) {
 		};
 
 		var sanitizedBody = removeMarkup(body);
-			fs = require('fs');
-			fs.writeFile('/Users/doron/Desktop/out.html', sanitizedBody.join('\n'));
 		var numRows = sanitizedBody.length;
 		for ( var i = 0; i < numRows; i += 4) {
 		    var machineType = sanitizedBody[i + 1];
