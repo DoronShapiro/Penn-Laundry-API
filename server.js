@@ -1,8 +1,30 @@
 var request = require('request'),
-	cheerio = require('cheerio'),
 	express = require('express');
 
 var laundryAlertURL = 'http://www.laundryalert.com/cgi-bin/penn6389/LMRoom?XallingPage=LMPage&Halls=';
+
+var removeMarkup = function (source) {
+	var start = source.indexOf("<table id=\"tablea\"");
+	source = source.substring(start);
+	var split = source.split('\n');
+	var markupBeacon = /^\s*</;
+	var nbspBeacon = /^\s*&nbsp;/;
+	var onlyWhitespaceBeacon = /^\s*$/;
+	var data = new Array();
+
+	for(var i = 0; i < split.length; i++) {
+		if (split[i].search(markupBeacon) == -1 && split[i].search(nbspBeacon) == -1 && split[i].search(onlyWhitespaceBeacon) == -1){
+			if(split[i].charAt(0) === '>') {
+				data.push(split[i].slice(50,split[i].length - 22).trim());
+			} else {
+				data.push(split[i].trim());
+			}
+		}
+	}
+	var firstUsefulLine = 4;
+	var lastUsefulLine = data.length - 2;
+	return data.slice(firstUsefulLine,lastUsefulLine);
+}
 
 var scrape = function (roomID, callback) {
 	var url =  laundryAlertURL + roomID;
@@ -16,28 +38,20 @@ var scrape = function (roomID, callback) {
 		    washers : [],
 		    dryers : []
 		};
-		
 
-		var $ = cheerio.load(body);
-		var $table = $('form[name="form1"]').children('table').last();
-		//var $table = $('form[name="form1"]');
-		var $rows = $table.children();
-
-		//var $rows = $('form[name="form1"] tr');
-
-		console.log($table.html());
-
-		var numRows = $rows.length - 2;
-		console.log(numRows);
-		for ( var i = 1; i < numRows; i++) {
-		    var $row = $rows.eq(i);
-		    var machineType = $row.children().eq(3).text().trim();
-		    if(machineType.charAt(0) === 'F'){
+		var sanitizedBody = removeMarkup(body);
+		var numRows = sanitizedBody.length;
+		for ( var i = 0; i < numRows; i += 4) {
+		    var machineType = sanitizedBody[i + 1];
+		    if (i+3 >= numRows || sanitizedBody[i + 3].search(/min|ago|unknown|status$/) == -1) {
+		    	i--;
+		    }
+		    if (machineType.charAt(0) === 'F') {
 				//Found a washer
-				scrapedData.washers.push($row.children().eq(5).text().trim());
+				scrapedData.washers.push(sanitizedBody[i + 3]);
 		    }else{
 				//It's a dryer
-				scrapedData.dryers.push($row.children().eq(5).text().trim());
+				scrapedData.dryers.push(sanitizedBody[i + 3]);
 		    }
 
 		}
